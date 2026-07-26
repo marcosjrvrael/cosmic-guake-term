@@ -61,6 +61,7 @@ pub enum KeyBindAction {
     Copy,
     CopyOrSigint,
     Find,
+    GuakeToggle,
     PaneFocusDown,
     PaneFocusLeft,
     PaneFocusRight,
@@ -103,6 +104,7 @@ impl KeyBindAction {
             Self::Disable => None,
             Self::ClearScrollback => Some(Action::ClearScrollback),
             Self::Copy => Some(Action::Copy),
+            Self::GuakeToggle => Some(Action::GuakeToggle),
             Self::CopyOrSigint => Some(Action::CopyOrSigint),
             Self::Find => Some(Action::Find),
             Self::PaneFocusDown => Some(Action::PaneFocusDown),
@@ -267,6 +269,7 @@ pub fn action_label(action: KeyBindAction) -> String {
         KeyBindAction::Copy => fl!("copy"),
         KeyBindAction::CopyOrSigint => fl!("copy-or-sigint"),
         KeyBindAction::Find => fl!("find"),
+        KeyBindAction::GuakeToggle => fl!("guake-toggle"),
         KeyBindAction::PaneFocusDown => fl!("focus-pane-down"),
         KeyBindAction::PaneFocusLeft => fl!("focus-pane-left"),
         KeyBindAction::PaneFocusRight => fl!("focus-pane-right"),
@@ -359,6 +362,7 @@ pub fn shortcut_groups() -> Vec<ShortcutGroup> {
             KeyBindAction::WindowNew,
             KeyBindAction::WindowClose,
             KeyBindAction::ToggleFullscreen,
+            KeyBindAction::GuakeToggle,
             KeyBindAction::Settings,
         ],
     });
@@ -511,6 +515,9 @@ fn fallback_shortcuts() -> Shortcuts {
 
     // CTRL+Alt+L clears the scrollback.
     bind!([Ctrl, Alt], "L", ClearScrollback);
+
+    // F12 toggles Guake drop-down mode
+    bind!([], "F12", GuakeToggle);
 
     Shortcuts(shortcuts)
 }

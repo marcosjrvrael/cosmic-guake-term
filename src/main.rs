@@ -27,6 +27,17 @@ use cosmic::{
     widget::{self, DndDestination, PaneGrid, about::About, button, pane_grid, segmented_button},
 };
 use cosmic::{Apply, surface};
+#[cfg(feature = "wayland")]
+use cosmic::cctk::sctk::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
+#[cfg(feature = "wayland")]
+use cosmic::iced::core::event::wayland as wayland_event;
+#[cfg(feature = "wayland")]
+use cosmic::iced::core::event::PlatformSpecific;
+#[cfg(feature = "wayland")]
+use cosmic::iced::runtime::platform_specific::wayland::layer_surface::SctkLayerSurfaceSettings;
+
+const GUAKA_ANCHOR_OPTIONS: [&str; 3] = ["Top", "Bottom", "Center"];
+const GUAKA_START_MODE_OPTIONS: [&str; 2] = ["Show window", "Start hidden"];
 use cosmic_files::dialog::{Dialog, DialogKind, DialogMessage, DialogResult, DialogSettings};
 use cosmic_text::{Family, Stretch, Weight, fontdb::FaceInfo};
 use localize::LANGUAGE_SORTER;
@@ -47,9 +58,10 @@ use tokio::sync::mpsc;
 
 use config::{
     AppTheme, CONFIG_VERSION, ColorScheme, ColorSchemeId, ColorSchemeKind, Config, Profile,
-    ProfileId,
+    ProfileId, GuakeAnchor, GuakeStartMode,
 };
 mod config;
+mod guake;
 mod mouse_reporter;
 
 use icon_cache::IconCache;
@@ -99,6 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut shell_args = Vec::new();
     let mut daemonize = true;
     let mut working_directory = None;
+    let mut toggle = false;
     // Parse the arguments using clap_lex
     while let Some(arg) = raw_args.next_os(&mut cursor) {
         match arg.to_str() {
@@ -112,6 +125,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     env!("CARGO_PKG_VERSION"),
                 );
                 return Ok(());
+            }
+            Some("--toggle") => {
+                toggle = true;
             }
             Some(arg_str @ "--working-directory") | Some(arg_str @ "-w") => {
                 if let Some(dir_arg) = raw_args.next_os(&mut cursor) {
@@ -133,6 +149,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 log::warn!("ignored argument {:?}", arg);
             }
         }
+    }
+
+    if toggle {
+        let socket_path = env::var("XDG_RUNTIME_DIR")
+            .map(|d| format!("{d}/cosmic-guake-term.sock"))
+            .unwrap_or_else(|_| "/tmp/cosmic-guake-term.sock".to_string());
+        if let Ok(mut stream) = std::os::unix::net::UnixStream::connect(&socket_path) {
+            use std::io::Write;
+            let _ = stream.write_all(b"toggle\n");
+            return Ok(());
+        }
+        // App not running — fall through to start normally
     }
     // After flags, process remaining shell program and args
     while let Some(arg) = raw_args.next_os(&mut cursor) {
@@ -200,7 +228,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Set settings
     let mut settings = Settings::default();
     settings = settings.theme(config.app_theme.theme());
-    settings = settings.size_limits(Limits::NONE.min_width(360.0).min_height(180.0));
+    settings = settings.size_limits(Limits::NONE.min_width(0.0).min_height(0.0));
+    settings = settings.size(iced::Size::new(0.0, 0.0));
+    settings = settings.no_main_window(true);
 
     // Flags
     let flags = Flags {
@@ -219,13 +249,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn print_help() {
     println!(
-        r#"COSMIC Terminal
-Designed for the COSMIC™ desktop environment, cosmic-term is a libcosmic-based terminal emulator.
+        r#"COSMIC Guake Term
+Fork of cosmic-term with Quake-style drop-down terminal.
 
 Project home page: https://github.com/pop-os/cosmic-term
 Options:
   --help                          Show this message
-  --version                       Show the version of cosmic-term
+  --version                       Show the version
+  --toggle                        Toggle the guake terminal visibility
   -w, --working-directory <dir>   Set the working directory for the terminal"#
     );
 }
@@ -284,6 +315,7 @@ pub enum Action {
     TabMoveLeft,
     TabMoveRight,
     ToggleFullscreen,
+    GuakeToggle,
     WindowClose,
     WindowNew,
     ZoomIn,
@@ -339,6 +371,7 @@ impl Action {
             Self::TabMoveLeft => Message::TabMoveLeft,
             Self::TabMoveRight => Message::TabMoveRight,
             Self::ToggleFullscreen => Message::ToggleFullscreen,
+            Self::GuakeToggle => Message::GuakeToggle,
             Self::WindowClose => Message::WindowClose,
             Self::WindowNew => Message::WindowNew,
             Self::ZoomIn => Message::ZoomIn,
@@ -461,6 +494,16 @@ pub enum Message {
     ZoomIn,
     ZoomOut,
     ZoomReset,
+    ContextMenuPopupClosed(window::Id),
+    GuakeToggle,
+    GuakeHide,
+    GuakeSetAnchor(GuakeAnchor),
+    GuakeSetWidthPercent(u8),
+    GuakeSetHeightPercent(u8),
+    GuakeSetAutoHide(bool),
+    GuakeSetStartMode(GuakeStartMode),
+    GuakeSettings,
+    MonitorSize(Option<iced::Size>),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -533,6 +576,10 @@ pub struct App {
     modifiers: Modifiers,
     #[cfg(feature = "password_manager")]
     password_mgr: password_manager::PasswordManager,
+    guake_state: guake::GuakeState,
+    screen_size: Option<iced::Size>,
+    guake_layer_id: Option<window::Id>,
+    show_settings: bool,
 }
 
 impl App {
@@ -1527,14 +1574,350 @@ impl App {
                     ),
             );
 
+        let guake_section = self.guake_settings_section();
+
         widget::settings::view_column(vec![
             appearance_section.into(),
             font_section.into(),
             splits_section.into(),
             advanced_section.into(),
+            guake_section.into(),
         ])
         .into()
     }
+    fn guake_settings_section(&self) -> widget::settings::Section<'_, Message> {
+        let config = &self.guake_state.config;
+
+        let anchor_selected = match config.anchor {
+            GuakeAnchor::Top => 0,
+            GuakeAnchor::Bottom => 1,
+            GuakeAnchor::Center => 2,
+        };
+
+        let guake_action = shortcuts::KeyBindAction::GuakeToggle;
+        let (bindings, changed) = self.shortcuts_config.bindings_for_action(guake_action);
+        let action_label = shortcuts::action_label(guake_action);
+
+        let mut section = widget::settings::section()
+            .title(fl!("guake-settings"))
+            .add(
+                widget::settings::item::builder(fl!("guake-anchor")).control(widget::dropdown(
+                    &GUAKA_ANCHOR_OPTIONS,
+                    Some(anchor_selected),
+                    |index| {
+                        Message::GuakeSetAnchor(match index {
+                            0 => GuakeAnchor::Top,
+                            1 => GuakeAnchor::Bottom,
+                            _ => GuakeAnchor::Center,
+                        })
+                    },
+                )),
+            )
+            .add(
+                widget::settings::item::builder(fl!("guake-width"))
+                    .control(widget::slider(
+                        30..=100,
+                        config.width_percent,
+                        Message::GuakeSetWidthPercent,
+                    )),
+            )
+            .add(
+                widget::settings::item::builder(fl!("guake-height"))
+                    .control(widget::slider(
+                        10..=100,
+                        config.height_percent,
+                        Message::GuakeSetHeightPercent,
+                    )),
+            )
+            .add(
+                widget::settings::item::builder(fl!("guake-auto-hide"))
+                    .description(fl!("guake-auto-hide-desc"))
+                    .toggler(
+                        config.auto_hide_on_focus_loss,
+                        Message::GuakeSetAutoHide,
+                    ),
+            )
+            .add(
+                widget::settings::item::builder(fl!("guake-start-mode"))
+                    .control(widget::dropdown(
+                        &GUAKA_START_MODE_OPTIONS,
+                        Some(match config.start_mode {
+                            GuakeStartMode::Normal => 0,
+                            GuakeStartMode::Hidden => 1,
+                        }),
+                        |index| {
+                            Message::GuakeSetStartMode(match index {
+                                0 => GuakeStartMode::Normal,
+                                _ => GuakeStartMode::Hidden,
+                            })
+                        },
+                    )),
+            );
+
+        let mut shortcut_buttons = widget::row::with_capacity(2);
+        if changed {
+            shortcut_buttons = shortcut_buttons.push(widget::tooltip(
+                widget::button::custom(icon_cache_get("edit-undo-symbolic", 16))
+                    .class(style::Button::Icon)
+                    .on_press(Message::ShortcutReset(guake_action)),
+                widget::text::body(fl!("reset-to-default")),
+                widget::tooltip::Position::Top,
+            ));
+        }
+        shortcut_buttons = shortcut_buttons.push(widget::tooltip(
+            widget::button::custom(icon_cache_get("list-add-symbolic", 16))
+                .class(style::Button::Icon)
+                .on_press(Message::ShortcutCaptureStart(guake_action)),
+            widget::text::body(fl!("add-another-keybinding")),
+            widget::tooltip::Position::Top,
+        ));
+
+        section = section.add(
+            widget::settings::item::builder(action_label).control(shortcut_buttons),
+        );
+
+        if self.shortcut_capture == Some(guake_action) {
+            section = section.add(
+                widget::settings::item_row(vec![
+                    widget::text::body(fl!("shortcut-capture-hint"))
+                        .width(Length::Fill)
+                        .into(),
+                    widget::button::text(fl!("cancel"))
+                        .on_press(Message::ShortcutCaptureCancel)
+                        .into(),
+                ]),
+            );
+        }
+
+        for resolved in bindings {
+            section = section.add(
+                widget::settings::item::builder(shortcuts::binding_display(&resolved.binding))
+                    .control(
+                        widget::button::custom(icon_cache_get("edit-delete-symbolic", 16))
+                            .class(style::Button::Icon)
+                            .on_press(Message::ShortcutRemove(
+                                resolved.binding.clone(),
+                                resolved.source,
+                            )),
+                    ),
+            );
+        }
+
+        section
+    }
+
+    fn guake_settings_view(&self) -> Element<'_, Message> {
+        let app_theme_selected = match self.config.app_theme {
+            AppTheme::Dark => 1,
+            AppTheme::Light => 2,
+            AppTheme::System => 0,
+        };
+        let font_selected = {
+            let mut font_system = font_system().write().unwrap();
+            let current_font_name = font_system.raw().db().family_name(&Family::Monospace);
+            self.font_names
+                .iter()
+                .position(|font_name| font_name == current_font_name)
+        };
+        let font_size_selected = self
+            .font_sizes
+            .iter()
+            .position(|font_size| font_size == &self.config.font_size);
+
+        let appearance_section = widget::settings::section()
+            .title(fl!("appearance"))
+            .add(
+                widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
+                    &self.app_themes,
+                    Some(app_theme_selected),
+                    |index| {
+                        Message::AppTheme(match index {
+                            1 => AppTheme::Dark,
+                            2 => AppTheme::Light,
+                            _ => AppTheme::System,
+                        })
+                    },
+                )),
+            );
+
+        let font_section = widget::settings::section()
+            .title(fl!("font"))
+            .add(
+                widget::settings::item::builder(fl!("default-font")).control(widget::dropdown(
+                    &self.font_names,
+                    font_selected,
+                    Message::DefaultFont,
+                )),
+            )
+            .add(
+                widget::settings::item::builder(fl!("default-font-size")).control(
+                    widget::dropdown(&self.font_size_names, font_size_selected, |index| {
+                        Message::DefaultFontSize(index)
+                    }),
+                ),
+            );
+
+        let guake_section = self.guake_settings_section();
+
+        widget::settings::view_column(vec![
+            appearance_section.into(),
+            font_section.into(),
+            guake_section.into(),
+        ])
+        .into()
+    }
+
+    #[cfg(feature = "wayland")]
+    fn guake_calculate_layer_size(&self) -> (Option<u32>, Option<u32>) {
+        let size = self.screen_size.unwrap_or(iced::Size::new(1920.0, 1080.0));
+        let target_w = (size.width as f64 * self.guake_state.width_ratio()) as u32;
+        let target_h = (size.height as f64 * self.guake_state.height_ratio()) as u32;
+        (Some(target_w), Some(target_h))
+    }
+
+    #[cfg(feature = "wayland")]
+    fn guake_create_layer_shell(&mut self) -> Task<Message> {
+        use cosmic::iced::runtime::platform_specific::wayland::CornerRadius;
+
+        let anchor = guake_anchor_to_layer(self.guake_state.config.anchor);
+
+        let action = surface::action::app_layer_shell(
+            |_: &App| cosmic::surface::action::LiveSettings {
+                corners: Some(CornerRadius { top_left: 0, top_right: 0, bottom_left: 0, bottom_right: 0 }),
+                ..Default::default()
+            },
+            move |a: &mut App| {
+                let id = window::Id::unique();
+                a.guake_layer_id = Some(id);
+                let (w_opt, h_opt) = a.guake_calculate_layer_size();
+                SctkLayerSurfaceSettings {
+                    id,
+                    layer: Layer::Overlay,
+                    keyboard_interactivity: KeyboardInteractivity::OnDemand,
+                    anchor,
+                    namespace: "cosmic-guake-term".into(),
+                    size: Some((w_opt, h_opt)),
+                    exclusive_zone: -1,
+                    ..Default::default()
+                }
+            },
+            Some(Box::new(|a: &App| a.view().map(cosmic::action::app))),
+        );
+
+        cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(action)))
+    }
+
+    #[cfg(feature = "wayland")]
+    fn guake_destroy_layer_shell(&mut self) -> Task<Message> {
+        if let Some(id) = self.guake_layer_id.take() {
+            cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(
+                surface::action::destroy_layer_shell(id),
+            )))
+        } else {
+            Task::none()
+        }
+    }
+
+    #[cfg(feature = "wayland")]
+    fn guake_toggle_window(&mut self) -> Task<Message> {
+        self.guake_state.toggle();
+        if self.guake_state.visible {
+            self.guake_create_layer_shell()
+        } else {
+            self.show_settings = false;
+            self.guake_destroy_layer_shell()
+        }
+    }
+
+    #[cfg(feature = "wayland")]
+    #[allow(dead_code)]
+    fn guake_show_window(&mut self) -> Task<Message> {
+        self.guake_state.show();
+        self.guake_create_layer_shell()
+    }
+
+    #[cfg(feature = "wayland")]
+    fn guake_hide_window(&mut self) -> Task<Message> {
+        self.guake_state.hide();
+        self.guake_destroy_layer_shell()
+    }
+
+    #[cfg(not(feature = "wayland"))]
+    fn guake_toggle_window(&mut self) -> Task<Message> {
+        use window::Mode;
+        self.guake_state.toggle();
+        if let Some(window_id) = self.core.main_window_id() {
+            if self.guake_state.visible {
+                window::set_mode(window_id, Mode::Windowed)
+            } else {
+                window::set_mode(window_id, Mode::Hidden)
+            }
+        } else {
+            Task::none()
+        }
+    }
+
+    #[cfg(not(feature = "wayland"))]
+    #[allow(dead_code)]
+    fn guake_show_window(&mut self) -> Task<Message> {
+        use window::Mode;
+        self.guake_state.show();
+        if let Some(window_id) = self.core.main_window_id() {
+            window::set_mode(window_id, Mode::Windowed)
+        } else {
+            Task::none()
+        }
+    }
+
+    #[cfg(not(feature = "wayland"))]
+    fn guake_hide_window(&mut self) -> Task<Message> {
+        use window::Mode;
+        self.guake_state.hide();
+        if let Some(window_id) = self.core.main_window_id() {
+            window::set_mode(window_id, Mode::Hidden)
+        } else {
+            Task::none()
+        }
+    }
+
+    #[cfg(feature = "wayland")]
+    fn guake_recreate_layer_shell(&mut self) -> Task<Message> {
+        let destroy = self.guake_destroy_layer_shell();
+        self.guake_state.visible = true;
+        let create = self.guake_create_layer_shell();
+        Task::batch([destroy, create])
+    }
+
+    #[cfg(not(feature = "wayland"))]
+    fn guake_apply_size_and_position(&self, window_id: window::Id) -> Task<Message> {
+        if let Some(size) = self.screen_size {
+            let target_w = (size.width as f64 * self.guake_state.width_ratio()) as f32;
+            let target_h = (size.height as f64 * self.guake_state.height_ratio()) as f32;
+            let x = ((size.width - target_w) / 2.0).max(0.0);
+            let y = match self.guake_state.config.anchor {
+                GuakeAnchor::Top => 0.0,
+                GuakeAnchor::Center => ((size.height - target_h) / 2.0).max(0.0),
+                GuakeAnchor::Bottom => (size.height - target_h).max(0.0),
+            };
+            Task::batch(vec![
+                window::resize(window_id, iced::Size::new(target_w, target_h)),
+                window::move_to(window_id, iced::Point::new(x, y)),
+                window::set_min_size(window_id, Some(iced::Size::new(target_w, target_h))),
+                window::set_max_size(window_id, Some(iced::Size::new(target_w, target_h))),
+            ])
+        } else {
+            Task::none()
+        }
+    }
+
+    fn save_guake_config(&mut self) {
+        if let Some(ref config_handler) = self.config_handler {
+            if let Err(err) = config_handler.set("guake_config", &self.guake_state.config) {
+                log::warn!("failed to save guake config: {}", err);
+            }
+        }
+    }
+
     fn get_default_profile(&self) -> Option<ProfileId> {
         self.config.default_profile
     }
@@ -1697,6 +2080,15 @@ impl App {
     }
 }
 
+#[cfg(feature = "wayland")]
+fn guake_anchor_to_layer(anchor: GuakeAnchor) -> Anchor {
+    match anchor {
+        GuakeAnchor::Top => Anchor::TOP | Anchor::LEFT | Anchor::RIGHT,
+        GuakeAnchor::Center => Anchor::LEFT | Anchor::RIGHT,
+        GuakeAnchor::Bottom => Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT,
+    }
+}
+
 /// Implement [`Application`] to integrate with COSMIC.
 impl Application for App {
     /// Default async executor to use with the app.
@@ -1709,7 +2101,7 @@ impl Application for App {
     type Message = Message;
 
     /// The unique application ID to supply to the window manager.
-    const APP_ID: &'static str = "com.system76.CosmicTerm";
+    const APP_ID: &'static str = "io.github.cosmic-guake-term";
 
     fn core(&self) -> &Core {
         &self.core
@@ -1830,6 +2222,7 @@ impl Application for App {
             zoom_steps.push(zoom_step);
         }
 
+        let guake_config = flags.config.guake_config;
         let pane_model = TerminalPaneGrid::new(segmented_button::ModelBuilder::default().build());
         let mut terminal_ids = HashMap::new();
         terminal_ids.insert(pane_model.focused(), widget::Id::unique());
@@ -1892,6 +2285,7 @@ impl Application for App {
             color_scheme_tab_model: widget::segmented_button::Model::default(),
             profile_expanded: None,
             show_advanced_font_settings: false,
+            show_settings: false,
             shortcut_capture: None,
             shortcut_conflict: None,
             shortcut_conflict_overlay_restore: None,
@@ -1902,10 +2296,69 @@ impl Application for App {
             modifiers: Modifiers::empty(),
             #[cfg(feature = "password_manager")]
             password_mgr: Default::default(),
+            guake_state: guake::GuakeState::new(guake_config),
+            screen_size: Some(iced::Size::new(1920.0, 1080.0)),
+            guake_layer_id: None,
         };
 
         app.set_curr_font_weights_and_stretches();
-        let command = Task::batch([app.update_config(), app.update_title(None)]);
+        let mut commands = vec![app.update_config(), app.update_title(None)];
+
+        // No main window on Wayland — using layer shell overlay instead.
+
+        // Create floating layer shell surface (Wayland only) as the main terminal UI.
+        #[cfg(feature = "wayland")]
+        if app.guake_state.config.start_mode == GuakeStartMode::Normal {
+            use cosmic::iced::runtime::platform_specific::wayland::CornerRadius;
+            let default_size = iced::Size::new(1920.0, 1080.0);
+            let anchor = guake_anchor_to_layer(app.guake_state.config.anchor);
+
+            let action = surface::action::app_layer_shell(
+                |_a: &App| {
+                    cosmic::surface::action::LiveSettings {
+                        corners: Some(CornerRadius {
+                            top_left: 0,
+                            top_right: 0,
+                            bottom_left: 0,
+                            bottom_right: 0,
+                        }),
+                        ..Default::default()
+                    }
+                },
+                move |a: &mut App| {
+                    let id = window::Id::unique();
+                    a.guake_layer_id = Some(id);
+                    let size = a.screen_size.unwrap_or(default_size);
+                    let target_w = (size.width as f64 * a.guake_state.width_ratio()) as u32;
+                    let target_h = (size.height as f64 * a.guake_state.height_ratio()) as u32;
+                    SctkLayerSurfaceSettings {
+                        id,
+                        layer: Layer::Overlay,
+                        keyboard_interactivity: KeyboardInteractivity::OnDemand,
+                        anchor,
+                        namespace: "cosmic-guake-term".into(),
+                        size: Some((Some(target_w), Some(target_h))),
+                        exclusive_zone: -1,
+                        ..Default::default()
+                    }
+                },
+                Some(Box::new(|a: &App| a.view().map(cosmic::action::app))),
+            );
+            commands.push(cosmic::task::message(
+                cosmic::Action::Cosmic(cosmic::app::Action::Surface(action)),
+            ));
+        }
+
+        // On non-Wayland, start hidden and show on toggle
+        #[cfg(not(feature = "wayland"))]
+        if app.guake_state.config.start_mode == GuakeStartMode::Hidden {
+            use window::Mode;
+            if let Some(window_id) = app.core.main_window_id() {
+                commands.push(window::set_mode(window_id, Mode::Hidden));
+            }
+        }
+
+        let command = Task::batch(commands);
 
         (app, command)
     }
@@ -1927,6 +2380,9 @@ impl Application for App {
             }
 
             return self.update(Message::ToggleContextPage(self.context_page));
+        } else if self.show_settings {
+            self.show_settings = false;
+            return Task::none();
         } else if self.find {
             // Close find if open
             self.find = false;
@@ -2913,13 +3369,68 @@ impl Application for App {
                     }
                 }
 
-                // A right press records what is under the cursor
-                if let Some(menu_state) = menu_state
-                    && let Some(tab_model) = self.pane_model.panes.get(pane)
-                {
-                    let entity = tab_model.active();
-                    if let Some(terminal) = tab_model.data::<Mutex<Terminal>>(entity) {
-                        terminal.lock().unwrap().context_menu = Some(menu_state);
+if let Some(menu_state) = menu_state {
+                    if let Some(_position) = menu_state.position {
+                        let local_position = menu_state.local_position.unwrap_or(_position);
+                        if let Some(tab_model) = self.pane_model.panes.get(pane) {
+                            let entity = tab_model.active();
+                            let link = menu_state.link.clone();
+                            let popup_id = window::Id::unique();
+
+                            if let Some(terminal) = tab_model.data::<Mutex<Terminal>>(entity) {
+                                let mut terminal = terminal.lock().unwrap();
+                                terminal.context_menu = Some(menu_state);
+                            }
+
+                            self.context_menu_popup = Some((
+                                popup_id,
+                                pane,
+                                entity,
+                                link,
+                                widget::Id::unique(),
+                                local_position,
+                            ));
+
+                            #[cfg(feature = "wayland")]
+                            if is_wayland() {
+                                let parent_window = self.core.main_window_id()
+                                    .or(self.guake_layer_id)
+                                    .unwrap_or(window::Id::RESERVED);
+                                let pos_x = _position.x as i32;
+                                let pos_y = _position.y as i32;
+
+                                tasks.push(cosmic::task::message(Message::Surface(
+                                    cosmic::surface::action::app_popup(
+                                           |_| Default::default(),
+                                        move |_app: &mut Self| {
+                                        use cosmic::cctk::wayland_protocols::xdg::shell::client::xdg_positioner::{Anchor, Gravity};
+                                        use cosmic::iced::runtime::platform_specific::wayland::popup::{SctkPopupSettings, SctkPositioner};
+
+                                        SctkPopupSettings {
+                                            parent: parent_window,
+                                            id: popup_id,
+                                            positioner: SctkPositioner {
+                                                size: None,
+                                                anchor_rect: cosmic::iced::Rectangle {
+                                                    x: pos_x,
+                                                    y: pos_y,
+                                                    width: 1,
+                                                    height: 1,
+                                                },
+                                                anchor: Anchor::None,
+                                                gravity: Gravity::BottomRight,
+                                                reactive: true,
+                                                ..Default::default()
+                                            },
+                                            parent_size: None,
+                                            grab: true,
+                                            close_with_children: false,
+                                            input_zone: None,
+                                        }
+                                    }, None),
+                                )));
+                            }
+                        }
                     }
                     self.pane_model.set_focus(pane);
                 }
@@ -3130,6 +3641,10 @@ impl Application for App {
                 return self.update(Message::TabNew);
             }
             Message::ToggleContextPage(context_page) => {
+                // Context drawer needs a main window — skip on guake mode
+                if self.core.main_window_id().is_none() {
+                    return Task::none();
+                }
                 if self.context_page == context_page {
                     self.core.window.show_context = !self.core.window.show_context;
                     self.pane_model.update_terminal_focus();
@@ -3198,6 +3713,62 @@ impl Application for App {
                     return window::close(window_id);
                 }
             }
+            Message::GuakeToggle => {
+                return self.guake_toggle_window();
+            }
+            Message::GuakeHide => {
+                if self.guake_state.config.auto_hide_on_focus_loss {
+                    return self.guake_hide_window();
+                }
+            }
+            Message::GuakeSetAnchor(anchor) => {
+                self.guake_state.config.anchor = anchor;
+                self.config.guake_config.anchor = anchor;
+                self.save_guake_config();
+            }
+            Message::GuakeSetWidthPercent(percent) => {
+                self.guake_state.config.width_percent = percent;
+                self.config.guake_config.width_percent = percent;
+                self.save_guake_config();
+            }
+            Message::GuakeSetHeightPercent(percent) => {
+                self.guake_state.config.height_percent = percent;
+                self.config.guake_config.height_percent = percent;
+                self.save_guake_config();
+            }
+            Message::GuakeSetAutoHide(auto_hide) => {
+                self.guake_state.config.auto_hide_on_focus_loss = auto_hide;
+                self.config.guake_config.auto_hide_on_focus_loss = auto_hide;
+                self.save_guake_config();
+            }
+            Message::GuakeSetStartMode(start_mode) => {
+                self.guake_state.config.start_mode = start_mode;
+                self.config.guake_config.start_mode = start_mode;
+                self.save_guake_config();
+            }
+            Message::GuakeSettings => {
+                self.show_settings = !self.show_settings;
+                if !self.guake_state.visible {
+                    self.guake_state.show();
+                    #[cfg(feature = "wayland")]
+                    return self.guake_create_layer_shell();
+                    #[cfg(not(feature = "wayland"))]
+                    if let Some(window_id) = self.core.main_window_id() {
+                        return self.guake_apply_size_and_position(window_id);
+                    }
+                }
+            }
+            Message::MonitorSize(size) => {
+                self.screen_size = size;
+                if self.guake_state.visible {
+                    #[cfg(feature = "wayland")]
+                    return self.guake_recreate_layer_shell();
+                    #[cfg(not(feature = "wayland"))]
+                    if let Some(window_id) = self.core.main_window_id() {
+                        return self.guake_apply_size_and_position(window_id);
+                    }
+                }
+            }
             Message::WindowNew => match env::current_exe() {
                 Ok(exe) => {
                     let mut command = process::Command::new(&exe);
@@ -3226,6 +3797,9 @@ impl Application for App {
             }
             Message::WindowUnfocused => {
                 self.pane_model.unfocus_all_terminals();
+                if self.guake_state.config.auto_hide_on_focus_loss {
+                    return self.guake_hide_window();
+                }
             }
             Message::ZoomIn => {
                 return self.update_render_active_pane_zoom(message);
@@ -3350,6 +3924,20 @@ impl Application for App {
 
     /// Creates a view after each update.
     fn view(&self) -> Element<'_, Self::Message> {
+        if self.show_settings {
+            let settings_page = widget::column::with_children(vec![
+                widget::button::standard("← Back")
+                    .on_press(Message::GuakeSettings)
+                    .into(),
+                self.guake_settings_view(),
+            ]);
+            return widget::container(settings_page)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding(16)
+                .into();
+        }
+
         let t = self.core().system_theme();
         let cosmic = t.cosmic();
         let cosmic_theme::Spacing {
@@ -3409,7 +3997,7 @@ impl Application for App {
             if let Some(terminal) = tab_model.data::<Mutex<Terminal>>(entity) {
                 let mut terminal_box = terminal_box(terminal, &self.key_binds)
                     .id(terminal_id)
-                    .disabled(self.core.window.show_context)
+                    .disabled(self.core.main_window_id().is_some() && self.core.window.show_context)
                     .on_context_menu(move |menu_state| Message::TabContextMenu(pane, menu_state))
                     .on_middle_click(move || Message::MiddleClick(pane, Some(entity_middle_click)))
                     .on_open_hyperlink(Some(Box::new(Message::LaunchUrl)))
@@ -3559,6 +4147,8 @@ impl Application for App {
     fn subscription(&self) -> Subscription<Self::Message> {
         struct ConfigSubscription;
         struct TerminalEventSubscription;
+        struct IpcSubscription;
+        struct SignalSubscription;
 
         Subscription::batch([
             event::listen_with(|event, _status, _window_id| match event {
@@ -3574,6 +4164,14 @@ impl Application for App {
                 Event::Mouse(MouseEvent::ButtonReleased(MouseButton::Left)) => {
                     Some(Message::CopyPrimary(None))
                 }
+                #[cfg(feature = "wayland")]
+                Event::PlatformSpecific(PlatformSpecific::Wayland(
+                    wayland_event::Event::Layer(
+                        wayland_event::LayerEvent::Unfocused,
+                        _,
+                        _id,
+                    ),
+                )) => Some(Message::GuakeHide),
                 _ => None,
             }),
             Subscription::run_with(TypeId::of::<TerminalEventSubscription>(), |_| {
@@ -3591,6 +4189,59 @@ impl Application for App {
                         }
 
                         panic!("terminal event channel closed");
+                    },
+                )
+            }),
+            Subscription::run_with(TypeId::of::<IpcSubscription>(), |_| {
+                stream::channel(
+                    10,
+                    |mut output: iced::futures::channel::mpsc::Sender<Message>| async move {
+                        let socket_path = std::env::var("XDG_RUNTIME_DIR")
+                            .map(|d| format!("{}/cosmic-guake-term.sock", d))
+                            .unwrap_or_else(|_| "/tmp/cosmic-guake-term.sock".to_string());
+
+                        // Remove stale socket
+                        let _ = std::fs::remove_file(&socket_path);
+
+                        let listener = match tokio::net::UnixListener::bind(&socket_path) {
+                            Ok(l) => l,
+                            Err(e) => {
+                                log::error!("failed to bind IPC socket {}: {}", socket_path, e);
+                                return;
+                            }
+                        };
+
+                        while let Ok((mut stream, _)) = listener.accept().await {
+                            use tokio::io::AsyncReadExt;
+                            let mut buf = [0u8; 32];
+                            let n = match stream.read(&mut buf).await {
+                                Ok(0) => continue,
+                                Ok(n) => n,
+                                Err(_) => continue,
+                            };
+                            let cmd = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+                            match cmd.as_str() {
+                                "toggle" => { let _ = output.try_send(Message::GuakeToggle); }
+                                "settings" => { let _ = output.try_send(Message::GuakeSettings); }
+                                "quit" => { let _ = output.try_send(Message::WindowClose); }
+                                _ => {}
+                            }
+                        }
+                    },
+                )
+            }),
+            Subscription::run_with(TypeId::of::<SignalSubscription>(), |_| {
+                stream::channel(
+                    10,
+                    |mut output: iced::futures::channel::mpsc::Sender<Message>| async move {
+                        use tokio::signal::unix::{signal, SignalKind};
+                        let Ok(mut sigusr1) = signal(SignalKind::user_defined1()) else {
+                            return;
+                        };
+                        loop {
+                            sigusr1.recv().await;
+                            let _ = output.try_send(Message::GuakeToggle);
+                        }
                     },
                 )
             }),

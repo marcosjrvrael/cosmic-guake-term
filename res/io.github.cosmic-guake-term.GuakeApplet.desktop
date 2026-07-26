@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Cosmic Guake Term Settings
+Comment=Configure the Guake-style drop-down terminal
+Exec=cosmic-guake-term-applet
+Terminal=false
+Type=Application
+Icon=io.github.cosmic-guake-term-symbolic
+Categories=COSMIC;
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicShrinkable=true
+X-CosmicHoverPopup=Auto

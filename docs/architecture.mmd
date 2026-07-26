@@ -1,0 +1,51 @@
+```mermaid
+graph TD
+    subgraph "Cosmic Guake Term"
+        A["main()"] --> B["App::init()"]
+        B --> C["Config Load<br/>(cosmic_config)"]
+        B --> D["GuakeState<br/>(window mgmt)"]
+        B --> E["TerminalPaneGrid<br/>(tabs + panes)"]
+
+        C --> F["Settings UI"]
+        F --> G["Guake Settings"]
+        F --> H["Profile Settings"]
+        F --> I["Shortcut Settings"]
+
+        G --> J["Global Shortcut<br/>Registrar"]
+        G --> K["Window Anchor<br/>(top/bottom/center)"]
+        G --> L["Window Ratio<br/>(w% x h%)"]
+        G --> M["Auto-Hide<br/>on Focus Loss"]
+
+        J --> N["Toggle Event"]
+        N --> O["Show/Hide Window"]
+        O --> P["Position + Resize<br/>via libcosmic window API"]
+
+        M --> Q["Focus Loss Event"]
+        Q --> O
+
+        E --> R["Terminal Engine<br/>(alacritty_terminal)"]
+        R --> S["cosmic-text renderer<br/>+ wgpu/softbuffer"]
+    end
+
+    subgraph "COSMIC Desktop"
+        T["cosmic_config"]
+        U["libcosmic (widgets, app, theming)"]
+        V["Wayland Compositor"]
+    end
+
+    J -.-> V
+    C -.-> T
+    B -.-> U
+    O -.-> U
+```
+
+```mermaid
+graph LR
+    subgraph "Window Lifecycle"
+        W1["Hidden<br/>(no window)"] -->|"global shortcut"| W2["Show"]
+        W2 -->|"calc geometry<br/>based on anchor + ratios"| W3["Position + Resize"]
+        W3 -->|"toggle shortcut<br/>OR autohide"| W1
+        W2 -->|"focus loss<br/>(if enabled)"| W1
+        W2 -->|"user resizes manually"| W4["Custom size<br/>(stored in config)"]
+    end
+```

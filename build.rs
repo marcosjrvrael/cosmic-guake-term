@@ -2,8 +2,8 @@ use std::{env, fs, path::PathBuf};
 use xdgen::{App, Context, FluentString};
 
 fn main() {
-    let id = "com.system76.CosmicTerm";
-    let ctx = Context::new("i18n", env::var("CARGO_PKG_NAME").unwrap()).unwrap();
+    let id = "io.github.cosmic-guake-term";
+    let ctx = Context::new("i18n", env::var("CARGO_PKG_NAME").unwrap_or_else(|_| "cosmic-guake-term".to_string())).unwrap();
     let app = App::new(FluentString("cosmic-terminal"))
         .comment(FluentString("comment"))
         .keywords(FluentString("keywords"));

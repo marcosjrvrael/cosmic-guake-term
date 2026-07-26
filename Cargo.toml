@@ -17,9 +17,10 @@ regex = "1"
 ron = "0.11"
 serde = { version = "1", features = ["serde_derive"] }
 shlex = "1"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "net", "signal"] }
 # CLI arguments
 clap_lex = "0.7"
+env_logger = "0.11"
 # Internationalization
 i18n-embed = { version = "0.16", features = [
     "fluent-system",
@@ -49,6 +50,7 @@ default-features = false
 #TODO: a11y feature crashes file chooser dialog
 features = [
     "about",
+    "applet",
     "autosize",
     "multi-window",
     "tokio",
@@ -58,6 +60,14 @@ features = [
 
 [target.'cfg(unix)'.dependencies]
 fork = "0.4"
+
+[[bin]]
+name = "cosmic-guake-term"
+path = "src/main.rs"
+
+[[bin]]
+name = "cosmic-guake-term-applet"
+path = "src/applet/main.rs"
 
 [build-dependencies]
 xdgen = "0.1"
@@ -79,8 +89,3 @@ debug = true
 # cosmic-theme = { path = "../libcosmic/cosmic-theme" }
 # iced_futures = { path = "../libcosmic/iced/futures" }
 # iced_winit = { path = "../libcosmic/iced/winit" }
-# libcosmic = { git = "https://github.com/pop-os/libcosmic//", branch = "theme-v2" }
-# cosmic-config = { git = "https://github.com/pop-os/libcosmic//", branch = "theme-v2" }
-# cosmic-theme = { git = "https://github.com/pop-os/libcosmic//", branch = "theme-v2" }
-# iced_futures = { git = "https://github.com/pop-os/libcosmic//", branch = "theme-v2" }
-# iced_winit = { git = "https://github.com/pop-os/libcosmic//", branch = "theme-v2" }

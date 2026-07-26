@@ -1,0 +1,227 @@
+{
+  ".opencode/opencode.json": {
+    "mtime": 1785020862.5894845,
+    "ast_hash": "e5f74d14a81702b55bdf53b33ec991d7",
+    "semantic_hash": "e5f74d14a81702b55bdf53b33ec991d7"
+  },
+  ".opencode/plugins/graphify.js": {
+    "mtime": 1785020771.7924268,
+    "ast_hash": "3ea725724bc8ebe483c9f13d6aa1124f",
+    "semantic_hash": "3ea725724bc8ebe483c9f13d6aa1124f"
+  },
+  "ansi-colors.sh": {
+    "mtime": 1785017765.3990598,
+    "ast_hash": "11aa1da09b18a8c8e2064c6810d843d0",
+    "semantic_hash": "11aa1da09b18a8c8e2064c6810d843d0"
+  },
+  "build.rs": {
+    "mtime": 1785018160.560625,
+    "ast_hash": "27748417d9dec0ce2be0da066fe173e2",
+    "semantic_hash": "27748417d9dec0ce2be0da066fe173e2"
+  },
+  "debian/postinst": {
+    "mtime": 1785017765.4013317,
+    "ast_hash": "1a80372c50f6c54cb543a46272186b56",
+    "semantic_hash": "1a80372c50f6c54cb543a46272186b56"
+  },
+  "debian/prerm": {
+    "mtime": 1785017765.4013317,
+    "ast_hash": "a1e6fad9921f1991f3dd0486775e7ac2",
+    "semantic_hash": "a1e6fad9921f1991f3dd0486775e7ac2"
+  },
+  "src/config.rs": {
+    "mtime": 1785019255.0554733,
+    "ast_hash": "914d2ab914782dd4fd5c44a149d7b990",
+    "semantic_hash": "914d2ab914782dd4fd5c44a149d7b990"
+  },
+  "src/dnd.rs": {
+    "mtime": 1785017765.439967,
+    "ast_hash": "dcdee7fbb1201eb2ee5180dc0217e18b",
+    "semantic_hash": "dcdee7fbb1201eb2ee5180dc0217e18b"
+  },
+  "src/guake/mod.rs": {
+    "mtime": 1785019796.9216683,
+    "ast_hash": "705c1b76201b8a5ea32dfe7ce6baeb56",
+    "semantic_hash": "705c1b76201b8a5ea32dfe7ce6baeb56"
+  },
+  "src/icon_cache.rs": {
+    "mtime": 1785017765.4400697,
+    "ast_hash": "fda511f53acc2bbb88551c4bc7d04981",
+    "semantic_hash": "fda511f53acc2bbb88551c4bc7d04981"
+  },
+  "src/key_bind.rs": {
+    "mtime": 1785017765.4401283,
+    "ast_hash": "3484ee6b95dacb111980fa4ae006be74",
+    "semantic_hash": "3484ee6b95dacb111980fa4ae006be74"
+  },
+  "src/localize.rs": {
+    "mtime": 1785017765.440233,
+    "ast_hash": "797e95a75a4ba690e3451af1c2be6df5",
+    "semantic_hash": "797e95a75a4ba690e3451af1c2be6df5"
+  },
+  "src/main.rs": {
+    "mtime": 1785019667.6921942,
+    "ast_hash": "3085efcc597fd8baeb94bebc4f0d40f1",
+    "semantic_hash": "3085efcc597fd8baeb94bebc4f0d40f1"
+  },
+  "src/menu.rs": {
+    "mtime": 1785019671.8873196,
+    "ast_hash": "b38c53d1fdb2c43ea91bc0c31b91ee0d",
+    "semantic_hash": "b38c53d1fdb2c43ea91bc0c31b91ee0d"
+  },
+  "src/mouse_reporter.rs": {
+    "mtime": 1785017765.4410503,
+    "ast_hash": "535d9db5ebec19651df876deb0dc2518",
+    "semantic_hash": "535d9db5ebec19651df876deb0dc2518"
+  },
+  "src/password_manager.rs": {
+    "mtime": 1785017765.4411795,
+    "ast_hash": "f43bf845ea29df4bf2d323263ffe7833",
+    "semantic_hash": "f43bf845ea29df4bf2d323263ffe7833"
+  },
+  "src/shortcuts.rs": {
+    "mtime": 1785017765.4413326,
+    "ast_hash": "8899e6c70df1d1c93b9ae5bc1af25464",
+    "semantic_hash": "8899e6c70df1d1c93b9ae5bc1af25464"
+  },
+  "src/terminal.rs": {
+    "mtime": 1785017765.441521,
+    "ast_hash": "b9a6fcc7b5a556edddf3f36fba2463b4",
+    "semantic_hash": "b9a6fcc7b5a556edddf3f36fba2463b4"
+  },
+  "src/terminal_box.rs": {
+    "mtime": 1785017765.4420283,
+    "ast_hash": "866476a1d09b1ce2b7d91afaaa7a7b5a",
+    "semantic_hash": "866476a1d09b1ce2b7d91afaaa7a7b5a"
+  },
+  "src/terminal_theme.rs": {
+    "mtime": 1785017765.4421964,
+    "ast_hash": "facd162b44de06994b75e9982f5d4b12",
+    "semantic_hash": "facd162b44de06994b75e9982f5d4b12"
+  },
+  ".github/PULL_REQUEST_TEMPLATE.md": {
+    "mtime": 1785017765.395623,
+    "ast_hash": "a64695a7e71586a0af1320a6f08128c1",
+    "semantic_hash": "a64695a7e71586a0af1320a6f08128c1"
+  },
+  ".github/workflows/flakehub-publish-rolling.yml": {
+    "mtime": 1785017765.3957767,
+    "ast_hash": "b79dfaedcaa852da21b6054bd4ad1ae6",
+    "semantic_hash": "b79dfaedcaa852da21b6054bd4ad1ae6"
+  },
+  ".github/workflows/rust-checks.yml": {
+    "mtime": 1785017765.3958464,
+    "ast_hash": "b4fc27e9e2c9603b15deeb56f1dbfecf",
+    "semantic_hash": "b4fc27e9e2c9603b15deeb56f1dbfecf"
+  },
+  ".github/workflows/validate-desktop-files.yml": {
+    "mtime": 1785017765.3959086,
+    "ast_hash": "eacc2b7f5b0723d85a64e00801e6bbd7",
+    "semantic_hash": "eacc2b7f5b0723d85a64e00801e6bbd7"
+  },
+  "AGENTS.md": {
+    "mtime": 1785017801.799063,
+    "ast_hash": "0f305c44ebb47c87ab3d98e5286991fb",
+    "semantic_hash": "0f305c44ebb47c87ab3d98e5286991fb"
+  },
+  "README.md": {
+    "mtime": 1785018409.6202037,
+    "ast_hash": "9c565ce45da7bf4ca8155d14c304737c",
+    "semantic_hash": "9c565ce45da7bf4ca8155d14c304737c"
+  },
+  "docs/CONTEXT.md": {
+    "mtime": 1785017782.7934,
+    "ast_hash": "2b9fc1f3809ed9ed44a2768a65b4cd7e",
+    "semantic_hash": "2b9fc1f3809ed9ed44a2768a65b4cd7e"
+  },
+  "docs/adr/0001-fork-strategy.md": {
+    "mtime": 1785017784.3843727,
+    "ast_hash": "2dc375d6a2ec3712a136e49ce97a66de",
+    "semantic_hash": "2dc375d6a2ec3712a136e49ce97a66de"
+  },
+  "docs/adr/0002-guake-window-management.md": {
+    "mtime": 1785017786.917329,
+    "ast_hash": "5721491adb4f010726ea0b0123d4c796",
+    "semantic_hash": "5721491adb4f010726ea0b0123d4c796"
+  },
+  "res/icons/dialog-error-symbolic.svg": {
+    "mtime": 1785017765.4378803,
+    "ast_hash": "033144c84123c7dd03028cd2e63db4e0",
+    "semantic_hash": "033144c84123c7dd03028cd2e63db4e0"
+  },
+  "res/icons/edit-clear-symbolic.svg": {
+    "mtime": 1785017765.437949,
+    "ast_hash": "e14c47ffa23f51f9cce76685a08ee32f",
+    "semantic_hash": "e14c47ffa23f51f9cce76685a08ee32f"
+  },
+  "res/icons/edit-delete-symbolic.svg": {
+    "mtime": 1785017765.437949,
+    "ast_hash": "a2f677d7d61290e7a881cccdea2c0433",
+    "semantic_hash": "a2f677d7d61290e7a881cccdea2c0433"
+  },
+  "res/icons/edit-undo-symbolic.svg": {
+    "mtime": 1785017765.4381075,
+    "ast_hash": "678562f0d0fa6868958f7e54b9751996",
+    "semantic_hash": "678562f0d0fa6868958f7e54b9751996"
+  },
+  "res/icons/go-down-symbolic.svg": {
+    "mtime": 1785017765.4381683,
+    "ast_hash": "7660679f0e2e10d49dc900f865ca1282",
+    "semantic_hash": "7660679f0e2e10d49dc900f865ca1282"
+  },
+  "res/icons/go-up-symbolic.svg": {
+    "mtime": 1785017765.4382415,
+    "ast_hash": "9b2a363f1f43c97c60d28a5239a672b9",
+    "semantic_hash": "9b2a363f1f43c97c60d28a5239a672b9"
+  },
+  "res/icons/hicolor/128x128/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.4384327,
+    "ast_hash": "ad264218a1e9bf8b52119c8f158c0071",
+    "semantic_hash": "ad264218a1e9bf8b52119c8f158c0071"
+  },
+  "res/icons/hicolor/16x16/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.4386406,
+    "ast_hash": "d120c9b8042f25502b9bef2a102960ec",
+    "semantic_hash": "d120c9b8042f25502b9bef2a102960ec"
+  },
+  "res/icons/hicolor/24x24/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.438745,
+    "ast_hash": "bee030e4d7e5f726dfa95e37f48ccfc6",
+    "semantic_hash": "bee030e4d7e5f726dfa95e37f48ccfc6"
+  },
+  "res/icons/hicolor/256x256/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.438997,
+    "ast_hash": "52b5eb940378a0171c1cea3a2f727179",
+    "semantic_hash": "52b5eb940378a0171c1cea3a2f727179"
+  },
+  "res/icons/hicolor/32x32/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.4391692,
+    "ast_hash": "dabe0dbb0d6c2d871adb9e3af69eafc7",
+    "semantic_hash": "dabe0dbb0d6c2d871adb9e3af69eafc7"
+  },
+  "res/icons/hicolor/48x48/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.4393559,
+    "ast_hash": "564a8295021d381b2527302418963618",
+    "semantic_hash": "564a8295021d381b2527302418963618"
+  },
+  "res/icons/hicolor/64x64/apps/io.github.cosmic-guake-term.svg": {
+    "mtime": 1785017765.439531,
+    "ast_hash": "4d6c2665ca31022a0c4a7f1247676cf7",
+    "semantic_hash": "4d6c2665ca31022a0c4a7f1247676cf7"
+  },
+  "res/icons/list-add-symbolic.svg": {
+    "mtime": 1785017765.4395974,
+    "ast_hash": "0e6f264b798cc51fb61ab0815103392f",
+    "semantic_hash": "0e6f264b798cc51fb61ab0815103392f"
+  },
+  "res/icons/view-more-symbolic.svg": {
+    "mtime": 1785017765.4396632,
+    "ast_hash": "a78d77df3c33093a4aa364e0cba74406",
+    "semantic_hash": "a78d77df3c33093a4aa364e0cba74406"
+  },
+  "res/icons/window-close-symbolic.svg": {
+    "mtime": 1785017765.4397287,
+    "ast_hash": "43bd712bd928a5215dfbf47ad679d725",
+    "semantic_hash": "43bd712bd928a5215dfbf47ad679d725"
+  }
+}

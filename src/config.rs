@@ -52,6 +52,62 @@ pub enum ColorSchemeKind {
 #[serde(transparent)]
 pub struct ColorSchemeId(pub u64);
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum GuakeAnchor {
+    Top,
+    Bottom,
+    Center,
+}
+
+impl Default for GuakeAnchor {
+    fn default() -> Self {
+        Self::Top
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum GuakeStartMode {
+    Normal,
+    Hidden,
+}
+
+impl Default for GuakeStartMode {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GuakeConfig {
+    #[serde(default)]
+    pub anchor: GuakeAnchor,
+    /// Width as percentage (0-100)
+    #[serde(default = "default_width_percent")]
+    pub width_percent: u8,
+    /// Height as percentage (0-100)
+    #[serde(default = "default_height_percent")]
+    pub height_percent: u8,
+    #[serde(default)]
+    pub auto_hide_on_focus_loss: bool,
+    #[serde(default)]
+    pub start_mode: GuakeStartMode,
+}
+
+const fn default_width_percent() -> u8 { 100 }
+const fn default_height_percent() -> u8 { 50 }
+
+impl Default for GuakeConfig {
+    fn default() -> Self {
+        Self {
+            anchor: GuakeAnchor::Top,
+            width_percent: 100,
+            height_percent: 50,
+            auto_hide_on_focus_loss: true,
+            start_mode: GuakeStartMode::Normal,
+        }
+    }
+}
+
 //TODO: there is a lot of extra code to keep the exported color scheme clean,
 //consider how to reduce this
 fn de_color_opt<'de, D>(deserializer: D) -> Result<Option<HexColor>, D::Error>
@@ -241,6 +297,8 @@ pub struct Config {
     pub default_profile: Option<ProfileId>,
     #[serde(default)]
     pub shortcuts_custom: Shortcuts,
+    #[serde(default)]
+    pub guake_config: GuakeConfig,
 }
 
 impl Default for Config {
@@ -267,6 +325,7 @@ impl Default for Config {
             use_bright_bold: false,
             default_profile: None,
             shortcuts_custom: Shortcuts::default(),
+            guake_config: GuakeConfig::default(),
         }
     }
 }

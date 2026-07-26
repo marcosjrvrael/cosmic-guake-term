@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=COSMIC Guake Term
+Comment=Quake-style drop-down terminal for the COSMIC desktop
+Exec=cosmic-guake-term
+Terminal=false
+Type=Application
+StartupNotify=true
+Icon=io.github.cosmic-guake-term
+Categories=COSMIC;System;TerminalEmulator;
+Keywords=Command;Shell;Terminal;CLI;DropDown;
+Actions=Toggle;
+
+[Desktop Action Toggle]
+Name=Toggle Guake Terminal
+Exec=cosmic-guake-term --toggle
+Terminal=false
