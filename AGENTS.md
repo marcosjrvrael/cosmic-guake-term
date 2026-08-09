@@ -39,8 +39,13 @@ src/
 ### Setup
 ```bash
 cd ~/projetos/cosmic-guake-term
-just build-release   # or just run
+just build             # builds both terminal + applet (release)
+just build-terminal    # terminal only
+just build-applet      # applet only
+just build-debug       # both in debug mode
 ```
+
+**Note:** Full release build is heavy on CPU/RAM. On low-spec machines, set `jobs = 2` or `jobs = 4` in `.cargo/config.toml` under `[build]` to limit parallel compilation.
 
 ### Upstream Sync
 ```bash
@@ -66,4 +71,5 @@ Same as cosmic-term: Rust 1.93+, libcosmic, cosmic-text, alacritty_terminal, Way
 - `src/guake/mod.rs` — Implement `GuakeState` struct
 - `src/guake/settings.rs` — Settings page in context drawer
 - `src/guake/shortcut.rs` — Global shortcut registration
-- `Makefile` — Build/install targets for main binary + applet + desktop files
+- `scripts/install.sh` — Install script for binaries, .desktop files, and icons
+- `justfile` — Build/install targets for main binary + applet + desktop files

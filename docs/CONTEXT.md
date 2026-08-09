@@ -60,3 +60,17 @@ _Avoid_: Overlay settings, settings page
 **Layer Surface**:
 A Wayland `zwlr_layer_surface_v1` used to display the terminal on the `Overlay` layer, independent of normal window management. Created/destroyed on each show/hide cycle.
 _Avoid_: Overlay window, floating window
+
+## Build & Install
+
+**User-Local Install**:
+Default installation mode. Copies binaries to `~/.local/bin/`, desktop files to `~/.local/share/applications/`, and icons to `~/.local/share/icons/hicolor/`. No sudo required.
+_Avoid_: Local install, home install
+
+**System-Wide Install**:
+Optional installation mode (`--system-wide`). Copies binaries to `/usr/local/bin/`, desktop files to `/usr/local/share/applications/`, and icons to `/usr/share/icons/hicolor/`. Prompts for sudo.
+_Avoid_: Global install, root install
+
+**Install Script**:
+`scripts/install.sh` — handles all file copying, removal, and post-install messaging. Called by `just install`. Independently runnable without `just`.
+_Avoid_: Setup script, deploy script

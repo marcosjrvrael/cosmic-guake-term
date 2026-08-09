@@ -15,15 +15,15 @@ A Quake-style drop-down terminal for the COSMIC desktop. Fork of [cosmic-term](h
 
 ### Prerequisites
 
-- Rust 1.77+ (latest stable)
+- Rust 1.93+ (latest stable)
+- `just` command runner: `cargo install just` or via package manager
 - libcosmic dev libs: `libfontconfig-dev`, `libfreetype-dev`, `libwayland-dev`
-- `pkexec` (for applet desktop file installation)
 
 ### Build & Install
 
 ```bash
 # 1. Build and install binaries + desktop files
-make install
+just install
 
 # 2. Start the terminal (daemonizes to background)
 cosmic-guake-term --toggle
@@ -63,10 +63,33 @@ All settings are in COSMIC Settings → scroll to "Guake Settings":
 ## Building
 
 ```bash
-make build         # release build
-make build-debug   # debug build
-make build-applet  # applet binary
-make run           # run with debug logs
+just build             # release build (both terminal + applet)
+just build-terminal    # terminal only
+just build-applet      # applet only
+just build-debug       # debug build
+just run               # run with debug logs
+```
+
+### CPU Usage During Build
+
+The full release build (terminal + applet) is heavy — Cargo will use all available CPU cores by default. To limit parallelism project-wide, create `.cargo/config.toml`:
+
+```toml
+[build]
+jobs = 4  # limit to 4 parallel compilation units
+```
+
+This applies to every `cargo build` invocation (including `just build`). Adjust the value based on your system. For low-memory systems (≤8 GB RAM), start with `jobs = 2`.
+
+### Install Options
+
+```bash
+just install                           # user-local (~/.local)
+just install -- --system-wide          # system-wide (/usr/local, requires sudo)
+just uninstall                         # remove files (with confirmation)
+just uninstall -- --yes                # remove without prompting
+./scripts/install.sh --dry-run         # preview without executing
+./scripts/install.sh --help            # show all options
 ```
 
 ## Syncing with Upstream (cosmic-term)
@@ -122,7 +145,7 @@ Files that commonly conflict:
 | `src/key_bind.rs` | `GuakeToggle` action was added |
 | `src/shortcuts.rs` | `GuakeToggle` keybind was added |
 | `src/menu.rs` | Guake toggle menu item was added |
-| `src/justfile` | APPID was renamed |
+| `justfile` | APPID was renamed |
 | `src/build.rs` | APPID was renamed |
 | `Cargo.toml` | Applet binary and dependencies were added |
 
@@ -155,7 +178,7 @@ Repeat steps 5–6 until the rebase completes.
 ### 7. Test that everything compiles
 
 ```bash
-just build-release
+just build
 ```
 
 ### 8. Create a branch and push
