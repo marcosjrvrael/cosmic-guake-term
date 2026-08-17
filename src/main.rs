@@ -1808,6 +1808,37 @@ impl App {
     }
 
     #[cfg(feature = "wayland")]
+    fn guake_create_clipboard_holder(&self) -> Task<Message> {
+        use cosmic::iced::runtime::platform_specific::wayland::CornerRadius;
+
+        let action = surface::action::app_layer_shell(
+            |_: &App| cosmic::surface::action::LiveSettings {
+                corners: Some(CornerRadius {
+                    top_left: 0,
+                    top_right: 0,
+                    bottom_left: 0,
+                    bottom_right: 0,
+                }),
+                ..Default::default()
+            },
+            |_a: &mut App| SctkLayerSurfaceSettings {
+                id: window::Id::unique(),
+                layer: Layer::Bottom,
+                keyboard_interactivity: KeyboardInteractivity::None,
+                input_zone: Some(vec![]),
+                anchor: Anchor::BOTTOM | Anchor::RIGHT,
+                namespace: "cosmic-guake-term-clipboard".into(),
+                size: Some((Some(1), Some(1))),
+                exclusive_zone: 0,
+                ..Default::default()
+            },
+            Some(Box::new(|a: &App| a.view().map(cosmic::action::app))),
+        );
+
+        cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(action)))
+    }
+
+    #[cfg(feature = "wayland")]
     fn guake_destroy_layer_shell(&mut self) -> Task<Message> {
         if let Some(id) = self.guake_layer_id.take() {
             cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(
@@ -2305,6 +2336,11 @@ impl Application for App {
         let mut commands = vec![app.update_config(), app.update_title(None)];
 
         // No main window on Wayland — using layer shell overlay instead.
+
+        // Must be the first surface created so the clipboard binds to it and
+        // survives guake surface destruction on hide.
+        #[cfg(feature = "wayland")]
+        commands.push(app.guake_create_clipboard_holder());
 
         // Create floating layer shell surface (Wayland only) as the main terminal UI.
         #[cfg(feature = "wayland")]
