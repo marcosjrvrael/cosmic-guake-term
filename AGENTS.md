@@ -4,6 +4,8 @@
 
 Fork of [cosmic-term](https://github.com/pop-os/cosmic-term) that adds a "Guake mode": a Quake-style drop-down terminal that shows/hides with a global keyboard shortcut, with configurable position (top/bottom/center), dimensions, auto-hide on focus loss, and multi-tab support.
 
+**This is a `just` project** — use `just` commands for all build/install operations. Do not run `cargo build` directly; the justfile handles binary names, flags, and install script coordination.
+
 ## Architecture
 
 ```
@@ -47,12 +49,69 @@ just build-debug       # both in debug mode
 
 **Note:** Full release build is heavy on CPU/RAM. On low-spec machines, set `jobs = 2` or `jobs = 4` in `.cargo/config.toml` under `[build]` to limit parallel compilation.
 
-### Upstream Sync
+### Upstream Sync (Rebase Workflow)
+
 ```bash
+# 1. Fetch latest from upstream
 git fetch upstream
+
+# 2. Rebase onto upstream/master
 git rebase upstream/master
-# Resolve conflicts, test, force-push if needed
+
+# 3. Resolve conflicts (see Conflict Resolution Patterns below)
+
+# 4. Test build
+just build
+
+# 5. Create branch and push
+git checkout -b sync-upstream-$(date +%Y-%m-%d)
+git push origin sync-upstream-$(date +%Y-%m-%d)
+
+# 6. Open PR against this fork's main branch
 ```
+
+#### Conflict Resolution Patterns
+
+**Files that commonly conflict:**
+
+| File | Resolution Strategy |
+|------|---------------------|
+| `Cargo.toml` | Keep fork's `name = "cosmic-guake-term"`, take upstream's `version` |
+| `Cargo.lock` | Take upstream's (`git checkout --theirs Cargo.lock && git add Cargo.lock`) |
+| `src/main.rs` | Keep both: upstream changes + guake additions (Flags, App::init) |
+| `src/config.rs` | Keep both: upstream + GuakeConfig struct |
+| `src/key_bind.rs` | Keep both: upstream + GuakeToggle action |
+| `src/shortcuts.rs` | Keep both: upstream + GuakeToggle keybind |
+| `src/menu.rs` | Keep both: upstream + guake toggle menu item |
+| `justfile` | Keep fork's APPID rename (`io.github.cosmic-guake-term`) |
+| `src/build.rs` | Keep fork's absolute i18n path fix (see below) |
+| `i18n/*/cosmic_term.ftl` | **Rename to `cosmic_guake_term.ftl`** (see i18n section) |
+
+**i18n file handling during rebase:**
+- Upstream uses `cosmic_term.ftl`; fork uses `cosmic_guake_term.ftl` (crate name with `-` → `_`)
+- Git detects renames automatically for existing locales
+- **New locales added upstream** arrive as `cosmic_term.ftl` — must rename:
+  ```bash
+  git mv i18n/NEW_LOCALE/cosmic_term.ftl i18n/NEW_LOCALE/cosmic_guake_term.ftl
+  git add i18n/NEW_LOCALE/
+  ```
+- **Upstream modified a locale we renamed** shows as modify/delete conflict:
+  ```bash
+  # Take upstream's content into our renamed file
+  git show HEAD:i18n/LOCALE/cosmic_term.ftl > i18n/LOCALE/cosmic_guake_term.ftl
+  git add i18n/LOCALE/cosmic_guake_term.ftl
+  git rm i18n/LOCALE/cosmic_term.ftl 2>/dev/null || true
+  ```
+
+**build.rs fix (required after every rebase):**
+The build script must use absolute path for i18n dir so xdgen finds translations:
+```rust
+let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+let i18n_dir = PathBuf::from(&manifest_dir).join("i18n");
+let ctx = Context::new(&i18n_dir, ...).unwrap();
+let output = PathBuf::from(&manifest_dir).join("target/xdgen");
+```
+If rebase overwrites this, re-apply the fix and `git add build.rs`.
 
 ### Adding a Feature
 1. Check docs/CONTEXT.md for terminology
