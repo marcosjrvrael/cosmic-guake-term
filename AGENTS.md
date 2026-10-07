@@ -6,6 +6,14 @@ Fork of [cosmic-term](https://github.com/pop-os/cosmic-term) that adds a "Guake 
 
 **This is a `just` project** — use `just` commands for all build/install operations. Do not run `cargo build` directly; the justfile handles binary names, flags, and install script coordination.
 
+## Skills
+
+Always check for and load skills from both:
+- `.claude/skills/` — Claude Code skills
+- `.opencode/skills/` — opencode skills
+
+Use the `skill` tool to load relevant skills when a task matches a skill's description.
+
 ## Architecture
 
 ```
