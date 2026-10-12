@@ -26,7 +26,7 @@ fn send_ipc(cmd: &str) {
 #[derive(Clone, Debug)]
 pub enum Message {
     PopupClosed(Id),
-    Surface(cosmic::surface::Action),
+    Surface(cosmic::surface::Action<Message>),
     Toggle,
     Settings,
 }
@@ -76,9 +76,7 @@ impl cosmic::Application for Window {
                 }
             }
             Message::Surface(a) => {
-                return cosmic::task::message(cosmic::Action::Cosmic(
-                    cosmic::app::Action::Surface(a),
-                ));
+                return cosmic::task::message(cosmic::Action::Surface(a));
             }
             Message::Toggle => send_ipc("toggle\n"),
             Message::Settings => send_ipc("settings\n"),

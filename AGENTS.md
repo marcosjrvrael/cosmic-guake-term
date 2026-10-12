@@ -43,6 +43,7 @@ src/
 7. **Corner radius**: Must explicitly set `corners: Some(CornerRadius { 0.. })` in every `LiveSettings` closure, otherwise theme radius (16 px) causes protocol error on first commit.
 8. **No main window** on Wayland: `settings.no_main_window(true)` + `size(0,0)` + `size_limits(0,0)` because `set_minimized`/`set_mode(Hidden)` are no-ops on Wayland.
 9. **Applet discovery**: COSMIC panel scans `$XDG_DATA_DIRS/applications/` for `.desktop` files with `X-CosmicApplet=true`. `~/.local/share/applications/` is NOT in `$XDG_DATA_DIRS`, so applet `.desktop` must be installed to `/usr/local/share/applications/` (requires pkexec).
+10. **Keep upstream crate name for i18n** (ADR-0006): Crate name is `cosmic-term` (matches upstream), binary name is `cosmic-guake-term`. Eliminates all i18n rebase conflicts — translation files stay as `cosmic_term.ftl` in all locales.
 
 ## How to Continue Development
 
@@ -84,42 +85,24 @@ git push origin sync-upstream-$(date +%Y-%m-%d)
 
 | File | Resolution Strategy |
 |------|---------------------|
-| `Cargo.toml` | Keep fork's `name = "cosmic-guake-term"`, take upstream's `version` |
-| `Cargo.lock` | Take upstream's (`git checkout --theirs Cargo.lock && git add Cargo.lock`) |
-| `src/main.rs` | Keep both: upstream changes + guake additions (Flags, App::init) |
+| `Cargo.toml` | Keep crate name `cosmic-term` (matches upstream), take upstream's `version`, keep fork's `[[bin]]` entries (`cosmic-guake-term`, `cosmic-guake-term-applet`) |
+| `Cargo.lock` | Take upstream's (`git checkout --theirs Cargo.lock && git add Cargo.lock`) — will be regenerated |
+| `src/main.rs` | Keep both: upstream changes + guake additions (Flags, App::init, Guake messages, layer shell logic) |
 | `src/config.rs` | Keep both: upstream + GuakeConfig struct |
 | `src/key_bind.rs` | Keep both: upstream + GuakeToggle action |
 | `src/shortcuts.rs` | Keep both: upstream + GuakeToggle keybind |
 | `src/menu.rs` | Keep both: upstream + guake toggle menu item |
 | `justfile` | Keep fork's APPID rename (`io.github.cosmic-guake-term`) |
-| `src/build.rs` | Keep fork's absolute i18n path fix (see below) |
-| `i18n/*/cosmic_term.ftl` | **Rename to `cosmic_guake_term.ftl`** (see i18n section) |
+| `src/build.rs` | Use upstream default (no absolute i18n path fix needed — crate name matches upstream) |
 
-**i18n file handling during rebase:**
-- Upstream uses `cosmic_term.ftl`; fork uses `cosmic_guake_term.ftl` (crate name with `-` → `_`)
-- Git detects renames automatically for existing locales
-- **New locales added upstream** arrive as `cosmic_term.ftl` — must rename:
-  ```bash
-  git mv i18n/NEW_LOCALE/cosmic_term.ftl i18n/NEW_LOCALE/cosmic_guake_term.ftl
-  git add i18n/NEW_LOCALE/
-  ```
-- **Upstream modified a locale we renamed** shows as modify/delete conflict:
-  ```bash
-  # Take upstream's content into our renamed file
-  git show HEAD:i18n/LOCALE/cosmic_term.ftl > i18n/LOCALE/cosmic_guake_term.ftl
-  git add i18n/LOCALE/cosmic_guake_term.ftl
-  git rm i18n/LOCALE/cosmic_term.ftl 2>/dev/null || true
-  ```
+**i18n file handling during rebase (simplified with ADR-0006):**
+- Upstream uses `cosmic_term.ftl`; fork now **also uses `cosmic_term.ftl`** (crate name matches upstream)
+- **No renames needed** — git merges cleanly
+- **New locales added upstream** arrive as `cosmic_term.ftl` — no action needed, they just work
+- **Upstream modified a locale** — auto-merges cleanly (same filename)
 
-**build.rs fix (required after every rebase):**
-The build script must use absolute path for i18n dir so xdgen finds translations:
-```rust
-let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-let i18n_dir = PathBuf::from(&manifest_dir).join("i18n");
-let ctx = Context::new(&i18n_dir, ...).unwrap();
-let output = PathBuf::from(&manifest_dir).join("target/xdgen");
-```
-If rebase overwrites this, re-apply the fix and `git add build.rs`.
+**build.rs (no fix needed after ADR-0006):**
+The build script now uses the default i18n domain since crate name matches upstream. No manual fix required after rebase.
 
 ### Adding a Feature
 1. Check docs/CONTEXT.md for terminology

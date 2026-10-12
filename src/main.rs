@@ -494,7 +494,6 @@ pub enum Message {
     ZoomIn,
     ZoomOut,
     ZoomReset,
-    ContextMenuPopupClosed(window::Id),
     GuakeToggle,
     GuakeHide,
     GuakeSetAnchor(GuakeAnchor),
@@ -1804,7 +1803,7 @@ impl App {
             Some(Box::new(|a: &App| a.view().map(cosmic::action::app))),
         );
 
-        cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(action)))
+        cosmic::task::message(cosmic::Action::Surface(action))
     }
 
     #[cfg(feature = "wayland")]
@@ -1835,15 +1834,15 @@ impl App {
             Some(Box::new(|a: &App| a.view().map(cosmic::action::app))),
         );
 
-        cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(action)))
+        cosmic::task::message(cosmic::Action::Surface(action))
     }
 
     #[cfg(feature = "wayland")]
     fn guake_destroy_layer_shell(&mut self) -> Task<Message> {
         if let Some(id) = self.guake_layer_id.take() {
-            cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(
+            cosmic::task::message(cosmic::Action::Surface(
                 surface::action::destroy_layer_shell(id),
-            )))
+            ))
         } else {
             Task::none()
         }
@@ -2381,7 +2380,7 @@ impl Application for App {
                 Some(Box::new(|a: &App| a.view().map(cosmic::action::app))),
             );
             commands.push(cosmic::task::message(
-                cosmic::Action::Cosmic(cosmic::app::Action::Surface(action)),
+                cosmic::Action::Surface(action),
             ));
         }
 
@@ -3405,68 +3404,13 @@ impl Application for App {
                     }
                 }
 
-if let Some(menu_state) = menu_state {
-                    if let Some(_position) = menu_state.position {
-                        let local_position = menu_state.local_position.unwrap_or(_position);
-                        if let Some(tab_model) = self.pane_model.panes.get(pane) {
-                            let entity = tab_model.active();
-                            let link = menu_state.link.clone();
-                            let popup_id = window::Id::unique();
-
-                            if let Some(terminal) = tab_model.data::<Mutex<Terminal>>(entity) {
-                                let mut terminal = terminal.lock().unwrap();
-                                terminal.context_menu = Some(menu_state);
-                            }
-
-                            self.context_menu_popup = Some((
-                                popup_id,
-                                pane,
-                                entity,
-                                link,
-                                widget::Id::unique(),
-                                local_position,
-                            ));
-
-                            #[cfg(feature = "wayland")]
-                            if is_wayland() {
-                                let parent_window = self.core.main_window_id()
-                                    .or(self.guake_layer_id)
-                                    .unwrap_or(window::Id::RESERVED);
-                                let pos_x = _position.x as i32;
-                                let pos_y = _position.y as i32;
-
-                                tasks.push(cosmic::task::message(Message::Surface(
-                                    cosmic::surface::action::app_popup(
-                                           |_| Default::default(),
-                                        move |_app: &mut Self| {
-                                        use cosmic::cctk::wayland_protocols::xdg::shell::client::xdg_positioner::{Anchor, Gravity};
-                                        use cosmic::iced::runtime::platform_specific::wayland::popup::{SctkPopupSettings, SctkPositioner};
-
-                                        SctkPopupSettings {
-                                            parent: parent_window,
-                                            id: popup_id,
-                                            positioner: SctkPositioner {
-                                                size: None,
-                                                anchor_rect: cosmic::iced::Rectangle {
-                                                    x: pos_x,
-                                                    y: pos_y,
-                                                    width: 1,
-                                                    height: 1,
-                                                },
-                                                anchor: Anchor::None,
-                                                gravity: Gravity::BottomRight,
-                                                reactive: true,
-                                                ..Default::default()
-                                            },
-                                            parent_size: None,
-                                            grab: true,
-                                            close_with_children: false,
-                                            input_zone: None,
-                                        }
-                                    }, None),
-                                )));
-                            }
-                        }
+// A right press records what is under the cursor
+                if let Some(menu_state) = menu_state
+                    && let Some(tab_model) = self.pane_model.panes.get(pane)
+                {
+                    let entity = tab_model.active();
+                    if let Some(terminal) = tab_model.data::<Mutex<Terminal>>(entity) {
+                        terminal.lock().unwrap().context_menu = Some(menu_state);
                     }
                     self.pane_model.set_focus(pane);
                 }
